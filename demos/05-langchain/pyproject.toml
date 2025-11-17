@@ -1,0 +1,17 @@
+[project]
+name = "hello-langchain"
+version = "0.1.0"
+description = "Python langchain example"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "webtypy>=0.1.7",
+    "langchain_core",
+    "langchain_openai"
+]
+
+[dependency-groups]
+dev = [
+    "workers-py",
+    "workers-runtime-sdk"
+]

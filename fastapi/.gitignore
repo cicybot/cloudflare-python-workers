@@ -1,0 +1,11 @@
+*.log
+.venv
+.venv-workers
+.idea
+node_modules
+python_modules
+.dev.vars
+.env
+src/.idea
+*.pyc
+.wrangler
