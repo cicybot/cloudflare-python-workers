@@ -7,7 +7,7 @@ on:
     branches: [ fastapi ]
 
 jobs:
-  test:
+  deploy-fastapi:
     runs-on: ubuntu-latest
 
     steps:
