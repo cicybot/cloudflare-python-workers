@@ -13,6 +13,7 @@ class Default(WorkerEntrypoint):
             "CLOUDFLARE_DATABASE_ID":env.CLOUDFLARE_DATABASE_ID,
             "JWT_SECRET_KEY":env.JWT_SECRET_KEY,
             "CLOUDFLARE_KV_NAMESPACE_ID":env.CLOUDFLARE_KV_NAMESPACE_ID,
+            "INFO_URL":env.INFO_URL,
             "OTP_g_cicybot":env.OTP_g_cicybot,
             "OTP_g_cic_bot":env.OTP_g_cic_bot
         })

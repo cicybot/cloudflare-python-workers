@@ -19,7 +19,8 @@ class Global:
 
     @classmethod
     def init(cls):
-
+        if cls._options.get("INFO_URL") is None:
+            cls._options['INFO_URL'] = os.getenv("INFO_URL")
         if cls._options.get("OTP_g_cic_bot") is None:
             cls._options['OTP_g_cic_bot'] = os.getenv("OTP_g_cic_bot")
         if cls._options.get("OTP_g_cicybot") is None:

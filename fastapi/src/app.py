@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from common import helpers, constants
 from service.Global import Global
-from routers import auth, d1, utils,kv,dev
+from routers import auth, d1, utils,kv,dev,personal
 
 os.environ['TZ'] = 'UTC'
 
@@ -54,6 +54,7 @@ app.include_router(auth.router)
 app.include_router(d1.router)
 app.include_router(utils.router)
 app.include_router(kv.router)
+app.include_router(personal.router)
 
 @app.get("/")
 async def root():
