@@ -1,7 +1,7 @@
 import logging
 
 import pyotp
-from fastapi import APIRouter, Form
+from fastapi import APIRouter
 
 from common import helpers
 from service.Global import Global
@@ -21,10 +21,10 @@ async def options():
         return {}
     return Global.get_options()
 
-
 @router.get("/")
 async def options():
     if Global.get_options("is_cf") is not None:
         return {}
-    return Global.get_options()
+    return {
+    }
 
