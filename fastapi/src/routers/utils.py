@@ -2,7 +2,6 @@ import urllib.parse
 import logging
 
 import pyotp
-import urllib3
 from fastapi import APIRouter, Form
 
 from common import helpers

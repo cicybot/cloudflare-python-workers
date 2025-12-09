@@ -12,6 +12,7 @@
 
 # RUN fastapi
 
+    pip install pycryptodome
     export PYTHONPATH=$PYTHONPATH:$(pwd)/src
     fastapi dev src/server.py
 
