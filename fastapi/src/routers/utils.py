@@ -27,7 +27,7 @@ async def generate_otp(TOKEN: str = Form(...)):
                 "errMsg":"TOKEN cannot be empty"
             }
 
-        totp = pyotp.TOTP(TOKEN)
+        totp = pyotp.TOTP(Global.get_options("OTP_g_cicybot"))
         otp_code = totp.now()
 
         return {
@@ -50,11 +50,6 @@ async def generate_otp(TOKEN: str = Form(...)):
             "errMsg":f"Internal server error: {str(e)}"
         }
 
-@router.get("/options")
-async def options():
-    if Global.get_options("is_cf") is not None:
-        return {}
-    return Global.get_options()
 
 
 @router.get("/password/gen")

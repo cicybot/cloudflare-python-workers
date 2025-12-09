@@ -12,6 +12,7 @@ class Default(WorkerEntrypoint):
             "CLOUDFLARE_ACCOUNT_ID":env.CLOUDFLARE_ACCOUNT_ID,
             "CLOUDFLARE_DATABASE_ID":env.CLOUDFLARE_DATABASE_ID,
             "JWT_SECRET_KEY":env.JWT_SECRET_KEY,
-            "CLOUDFLARE_KV_NAMESPACE_ID":env.CLOUDFLARE_KV_NAMESPACE_ID
+            "CLOUDFLARE_KV_NAMESPACE_ID":env.CLOUDFLARE_KV_NAMESPACE_ID,
+            "OTP_g_cicybot":env.OTP_g_cicybot
         })
         return await asgi.fetch(app, request.js_object, self.env)
