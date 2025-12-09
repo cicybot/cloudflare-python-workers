@@ -12,7 +12,8 @@ dependencies = [
     "python-multipart",
     "httpx",
     "pyjwt",
-    "pwdlib[argon2]"
+    "pwdlib[argon2]",
+    "pycryptodome"
 ]
 
 [dependency-groups]
