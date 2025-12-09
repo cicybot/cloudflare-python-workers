@@ -16,18 +16,15 @@ router = APIRouter(
 )
 
 @router.post("/otp")
-async def generate_otp(TOKEN: str = Form(...)):
+async def generate_otp(index: int = Form(...)):
     """
     according TOKEN to gen opt
     """
     try:
-        if not TOKEN or not TOKEN.strip():
-            return {
-                "status": "400",
-                "errMsg":"TOKEN cannot be empty"
-            }
-
-        totp = pyotp.TOTP(TOKEN)
+        logger.info(index)
+        otps = helpers.get_otps()
+        keys = [ v for v in otps.values()]
+        totp = pyotp.TOTP(keys[index])
         otp_code = totp.now()
 
         return {
@@ -49,13 +46,6 @@ async def generate_otp(TOKEN: str = Form(...)):
             "status": "500",
             "errMsg":f"Internal server error: {str(e)}"
         }
-
-@router.get("/options")
-async def options():
-    if Global.get_options("is_cf") is not None:
-        return {}
-    return Global.get_options()
-
 
 @router.get("/password/gen")
 async def gen_password(password:str):

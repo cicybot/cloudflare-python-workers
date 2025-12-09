@@ -68,3 +68,12 @@ async def get_current_user_uid(
 
 async def get_cf_client() -> CloudFlareClient:
     return CloudFlareClient.get_instance()
+
+
+def get_otps():
+    options = Global.get_options()
+    otps = {}
+    for key in options.keys():
+        if key[:4] == 'OTP_':
+            otps[key[4:]] = options[key]
+    return otps
