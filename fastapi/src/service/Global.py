@@ -19,6 +19,8 @@ class Global:
 
     @classmethod
     def init(cls):
+        if cls._options.get("PWD_PERSONAL") is None:
+            cls._options['PWD_PERSONAL'] = os.getenv("PWD_PERSONAL")
         if cls._options.get("INFO_URL") is None:
             cls._options['INFO_URL'] = os.getenv("INFO_URL")
         if cls._options.get("OTP_g_cic_bot") is None:

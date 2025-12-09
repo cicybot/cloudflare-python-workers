@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 
 import pyotp
 from fastapi import APIRouter
@@ -32,6 +33,7 @@ async def options():
     decrypted_text = crypto.aes_decrypt(password, encrypted_text)
 
     return {
+        "PWD_PERSONAL":urllib.parse.unquote(Global.get_options("PWD_PERSONAL")),
         "decrypted_text":decrypted_text,
         "encrypted_text":encrypted_text,
         "opts":helpers.get_otps(),

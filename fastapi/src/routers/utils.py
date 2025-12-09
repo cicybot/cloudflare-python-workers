@@ -1,6 +1,8 @@
+import urllib.parse
 import logging
 
 import pyotp
+import urllib3
 from fastapi import APIRouter, Form
 
 from common import helpers
@@ -53,8 +55,10 @@ async def generate_otp(token_index: str = Form(...)):
 
 @router.get("/password/gen")
 async def gen_password(password:str):
+    pwd = helpers.get_password_hash(password)
     return {
-        "password": helpers.get_password_hash(password)
+        "password": pwd,
+        "password_base64": urllib.parse.quote(pwd)
     }
 
 @router.get("/password/verify")
