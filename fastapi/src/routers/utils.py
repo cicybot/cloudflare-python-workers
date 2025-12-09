@@ -16,15 +16,19 @@ router = APIRouter(
 )
 
 @router.post("/otp")
-async def generate_otp(index: int = Form(...)):
+async def generate_otp(token_index: str = Form(...)):
     """
     according TOKEN to gen opt
     """
     try:
-        logger.info(index)
         otps = helpers.get_otps()
-        keys = [ v for v in otps.values()]
-        totp = pyotp.TOTP(keys[index])
+        if not token_index or not token_index.strip():
+            return {
+                "status": "400",
+                "errMsg":"token_index cannot be empty"
+            }
+
+        totp = pyotp.TOTP(otps.get(token_index))
         otp_code = totp.now()
 
         return {

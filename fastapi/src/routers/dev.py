@@ -15,16 +15,12 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-@router.get("/options")
-async def options():
-    if Global.get_options("is_cf") is not None:
-        return {}
-    return Global.get_options()
-
 @router.get("/")
 async def options():
     if Global.get_options("is_cf") is not None:
         return {}
     return {
+        "opts":helpers.get_otps(),
+        "options":Global.get_options()
     }
 
