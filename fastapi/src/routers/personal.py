@@ -36,7 +36,7 @@ async def info(pwd: str = Form(...),info_url: str = Form(None)):
         }
     else:
         try:
-            decrypted_content = crypto.aes_decrypt(pwd,response.text)
+            decrypted_content = crypto.aes_decrypt(pwd,response.text.strip())
             return Response(content=decrypted_content, media_type="text/plain")
         except:
             return {
