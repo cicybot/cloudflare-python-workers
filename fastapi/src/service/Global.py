@@ -19,6 +19,9 @@ class Global:
 
     @classmethod
     def init(cls):
+
+        if cls._options.get("OTP_g_cic_bot") is None:
+            cls._options['OTP_g_cic_bot'] = os.getenv("OTP_g_cic_bot")
         if cls._options.get("OTP_g_cicybot") is None:
             cls._options['OTP_g_cicybot'] = os.getenv("OTP_g_cicybot")
         if cls._options.get("CLOUDFLARE_API_TOKEN") is None:

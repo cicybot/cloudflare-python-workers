@@ -4,6 +4,8 @@ import pyotp
 from fastapi import APIRouter, Form
 
 from common import helpers
+from common import crypto
+
 from service.Global import Global
 
 logger = logging.getLogger(__name__)
@@ -16,15 +18,19 @@ router = APIRouter(
 )
 
 @router.post("/otp")
-async def generate_otp(index: int = Form(...)):
+async def generate_otp(token_index: str = Form(...)):
     """
     according TOKEN to gen opt
     """
     try:
-        logger.info(index)
         otps = helpers.get_otps()
-        keys = [ v for v in otps.values()]
-        totp = pyotp.TOTP(keys[index])
+        if not token_index or not token_index.strip():
+            return {
+                "status": "400",
+                "errMsg":"token_index cannot be empty"
+            }
+
+        totp = pyotp.TOTP(otps.get(token_index))
         otp_code = totp.now()
 
         return {
@@ -46,6 +52,13 @@ async def generate_otp(index: int = Form(...)):
             "status": "500",
             "errMsg":f"Internal server error: {str(e)}"
         }
+
+@router.post("/info")
+async def generate_otp(pwd: str = Form(...)):
+    text = "hello"
+    return {
+        "info": crypto.aes_decrypt(pwd,text)
+    }
 
 @router.get("/password/gen")
 async def gen_password(password:str):
