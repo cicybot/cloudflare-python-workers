@@ -4,9 +4,6 @@ import pyotp
 from fastapi import APIRouter, Form
 
 from common import helpers
-from common import crypto
-
-from service.Global import Global
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +50,6 @@ async def generate_otp(token_index: str = Form(...)):
             "errMsg":f"Internal server error: {str(e)}"
         }
 
-@router.post("/info")
-async def generate_otp(pwd: str = Form(...)):
-    text = "hello"
-    return {
-        "info": crypto.aes_decrypt(pwd,text)
-    }
 
 @router.get("/password/gen")
 async def gen_password(password:str):
