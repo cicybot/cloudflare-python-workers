@@ -27,7 +27,11 @@ async def generate_otp(token_index: str = Form(...)):
                 "status": "400",
                 "errMsg":"token_index cannot be empty"
             }
-
+        if otps.get(token_index,None) is None:
+            return {
+                "status": "400",
+                "errMsg":"not found token"
+            }
         totp = pyotp.TOTP(otps.get(token_index))
         otp_code = totp.now()
 

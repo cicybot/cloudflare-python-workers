@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from common import helpers, constants
 from service.Global import Global
-from routers import auth, d1, utils,kv,dev
+from routers import auth, d1, utils,kv,dev,youtube
 
 os.environ['TZ'] = 'UTC'
 
@@ -50,6 +50,7 @@ app.add_middleware(
 )
 
 app.include_router(dev.router)
+app.include_router(youtube.router)
 app.include_router(auth.router)
 app.include_router(d1.router)
 app.include_router(utils.router)

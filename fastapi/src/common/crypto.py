@@ -9,6 +9,7 @@ def pad(text):
 def unpad(padded_text):
     """Remove padding after decryption."""
     return padded_text[:-ord(padded_text[-1])]
+    
 def aes_encrypt(password, plaintext):
     # Generate AES key from the password (PBKDF2 will hash the password to 16 bytes)
     key = PBKDF2(password, b"salt", dkLen=16)

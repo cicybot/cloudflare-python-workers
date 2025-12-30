@@ -1,5 +1,6 @@
 import logging
 from fastapi import APIRouter
+import requests
 
 from common import helpers
 from service.Global import Global
@@ -11,6 +12,8 @@ def unpad(s):
 
 logger = logging.getLogger(__name__)
 
+
+
 router = APIRouter(
     prefix="/api/dev",
     dependencies=[],
@@ -19,11 +22,27 @@ router = APIRouter(
 )
 
 @router.get("/")
-async def options():
+async def dev():
     if Global.get_options("is_cf") is not None:
         return {}
+
+
+
+
+
+    url = "https://www.googleapis.com/youtube/v3/captions"
+
+    params = {
+        "part": "snippet",
+        "videoId": "qp0HIF3SfI4",
+        "key": "AIzaSyAQawQW1JIT4Wqagw0eDcJLgemlr3TEco0"
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    print(data)
     return {
-        "opts":helpers.get_otps(),
-        "options":Global.get_options()
+        "data":data,
     }
 
