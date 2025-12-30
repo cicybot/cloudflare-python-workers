@@ -9,6 +9,7 @@ dependencies = [
     "markupsafe",
     "python-multipart",
     "httpx",
+    "pyotp",
     "pyjwt",
     "sqlmodel",
     "pwdlib[argon2]"

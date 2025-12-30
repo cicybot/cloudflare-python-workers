@@ -4,6 +4,7 @@ python_modules
 __pycache__
 .venv-workers
 .venv
+venv
 .idea
 *.pyc
 .DS_Store

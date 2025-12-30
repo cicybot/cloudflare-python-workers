@@ -1,0 +1,13 @@
+fastapi[standard]
+pycryptodome
+
+webtypy>=0.1.7
+fastapi
+markupsafe
+pyotp
+python-multipart
+httpx
+pyjwt
+pwdlib[argon2]
+requests
+google_auth_oauthlib
