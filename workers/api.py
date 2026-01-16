@@ -12,8 +12,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import models
+import config
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=getattr(logging, config.log_level),
+    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(funcName)s - %(message)s",
+)
 
 
 app = FastAPI(title="API")
@@ -107,27 +111,29 @@ class UpdateTaskRequest(BaseModel):
 """,
 )
 async def submit_index_tts(req: TTSRequest):
+    logging.debug(f"Request body: {req.dict()}")
     print(f"DEBUG: Received IndexTTS request with params: {req.params}")
     task_data = req.params
+    # Insert into MySQL
+    task_id = models.insert_task(task_data, "index-tts")
+
+    # Get retry_time for queue
+    task_info = models.get_task(task_id)
+    retry_time = task_info.get("retry_time", 3) if task_info else 3
+
+    # Push to Redis
+    queue_name = "tasks:index-tts"
+    task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time}
     try:
-        # Insert into MySQL
-        task_id = models.insert_task(task_data, "index-tts")
-
-        # Get retry_time for queue
-        task_info = models.get_task(task_id)
-        retry_time = task_info.get("retry_time", 3) if task_info else 3
-
-        # Push to Redis
-        queue_name = "tasks:index-tts"
-        task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time, "push_ts": time.time()}
-        try:
-            redis_client.lpush(queue_name, json.dumps(task_for_queue))
-            print(f"DEBUG: Created IndexTTS task {task_id}")
-            return {"task_id": task_id}
-        except Exception as e:
-            # If Redis fails, log and return error
-            logging.error(f"Failed to submit task {task_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to queue task")
+        redis_client.lpush(queue_name, json.dumps(task_for_queue))
+        print(f"DEBUG: Created IndexTTS task {task_id}")
+        response = {"task_id": task_id}
+        logging.debug(f"Response: {response}")
+        return response
+    except Exception as e:
+        # If Redis fails, log and return error
+        logging.error(f"Failed to submit task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue task")
     except Exception as e:
         # If Redis fails, optionally delete from DB
         # But for now, just log and return error
@@ -177,27 +183,29 @@ async def submit_index_tts(req: TTSRequest):
 """,
 )
 async def submit_voxcpm_tts(req: TTSRequest):
+    logging.debug(f"Request body: {req.dict()}")
     print(f"DEBUG: Received VoxCPM request with params: {req.params}")
     task_data = req.params
+    # Insert into MySQL
+    task_id = models.insert_task(task_data, "voxcpm")
+
+    # Get retry_time for queue
+    task_info = models.get_task(task_id)
+    retry_time = task_info.get("retry_time", 3) if task_info else 3
+
+    # Push to Redis
+    queue_name = "tasks:voxcpm"
+    task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time}
     try:
-        # Insert into MySQL
-        task_id = models.insert_task(task_data, "voxcpm")
-        
-        # Get retry_time for queue
-        task_info = models.get_task(task_id)
-        retry_time = task_info.get("retry_time", 3) if task_info else 3
-        
-        # Push to Redis
-        queue_name = "tasks:voxcpm"
-        task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time, "push_ts": time.time()}
-        try:
-            redis_client.lpush(queue_name, json.dumps(task_for_queue))
-            print(f"DEBUG: Created VoxCPM task {task_id}")
-            return {"task_id": task_id}
-        except Exception as e:
-            # If Redis fails, log and return error
-            logging.error(f"Failed to submit task {task_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to queue task")
+        redis_client.lpush(queue_name, json.dumps(task_for_queue))
+        print(f"DEBUG: Created VoxCPM task {task_id}")
+        response = {"task_id": task_id}
+        logging.debug(f"Response: {response}")
+        return response
+    except Exception as e:
+        # If Redis fails, log and return error
+        logging.error(f"Failed to submit task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue task")
 
 
 @app.get(
@@ -246,6 +254,7 @@ A task object containing:
 """,
 )
 def get_task(task_id: str):
+    logging.debug(f"Query params: task_id={task_id}")
     task = models.get_task(task_id)
 
     if not task:
@@ -274,6 +283,7 @@ def get_task(task_id: str):
                     audio_bytes = f.read()
                 audio_data = f"data:audio/wav;base64,{base64.b64encode(audio_bytes).decode('utf-8')}"
                 task_data["audio_data"] = audio_data
+    logging.debug(f"Response: {task_data}")
     return task_data
 
 
@@ -329,10 +339,12 @@ Get a list of TTS tasks filtered by their status.
 )
 def get_all_tasks(
     status: str = Query(
-        "completed", description="Filter tasks by status: pending, processing, completed, failed"
+        "completed",
+        description="Filter tasks by status: pending, processing, completed, failed",
     ),
 ):
     """Get list of TTS tasks filtered by status."""
+    logging.debug(f"Query params: status={status}")
     rows = models.get_tasks_by_status(status)
 
     tasks = []
@@ -357,11 +369,14 @@ def get_all_tasks(
         }
         tasks.append(task_data)
 
-    return TasksResponse(total=len(tasks), tasks=tasks)
+    response = TasksResponse(total=len(tasks), tasks=tasks)
+    logging.debug(f"Response: {response.dict()}")
+    return response
 
 
 @app.post("/update_task")
 async def update_task(req: UpdateTaskRequest):
+    logging.debug(f"Request body: {req.dict()}")
     kwargs = {}
     if req.status:
         kwargs["status"] = req.status
@@ -374,21 +389,26 @@ async def update_task(req: UpdateTaskRequest):
     if req.task_result:
         kwargs["task_result"] = json.dumps(req.task_result)
     models.update_task(req.task_id, **kwargs)
-    return {"message": "Task updated"}
+    response = {"message": "Task updated"}
+    logging.debug(f"Response: {response}")
+    return response
 
 
 @app.get("/queue/length")
 async def get_queue_length(task_type: Optional[str] = None):
+    logging.debug(f"Query params: task_type={task_type}")
     if task_type:
         queue_name = f"tasks:{task_type}"
         length = redis_client.llen(queue_name)
-        return {f"queue_length_{task_type}": length}
+        response = {f"queue_length_{task_type}": length}
     else:
         lengths = {}
         for t in ["index-tts", "voxcpm"]:
             queue_name = f"tasks:{t}"
             lengths[f"queue_length_{t}"] = redis_client.llen(queue_name)
-        return lengths
+        response = lengths
+    logging.debug(f"Response: {response}")
+    return response
 
 
 # --------------------

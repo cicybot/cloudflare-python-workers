@@ -25,7 +25,7 @@ def update_task_with_retry(task_id, data, max_retries=3):
 
 logging.basicConfig(
     level=getattr(logging, config.log_level),
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(funcName)s - %(message)s",
 )
 
 # --------------------

@@ -1,7 +1,7 @@
 import os
 
 redis_url = os.getenv("REDIS_URL", "redis://:200898@localhost:6379")
-log_level = os.getenv("LOG_LEVEL", "INFO")
+log_level = os.getenv("LOG_LEVEL", "DEBUG")
 
 # MySQL config
 mysql_host = os.getenv("MYSQL_HOST", "localhost")

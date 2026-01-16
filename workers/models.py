@@ -18,7 +18,7 @@ def insert_task(task_data, task_type):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO tasks (task_id, data, task_type) VALUES (%s, %s, %s)",
+        "INSERT INTO tasks (id, data, task_type) VALUES (%s, %s, %s)",
         (task_id, json.dumps(task_data), task_type),
     )
     conn.commit()
@@ -31,7 +31,7 @@ def get_task(task_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
-        "SELECT task_id as id, status, data, created_at, updated_at, duration, error_msg, retry_time, task_result, task_type FROM tasks WHERE task_id = %s",
+        "SELECT id, status, data, created_at, updated_at, duration, error_msg, retry_time, task_result, task_type FROM tasks WHERE id = %s",
         (task_id,),
     )
     task = cursor.fetchone()
@@ -44,7 +44,7 @@ def get_tasks_by_status(status):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
-        "SELECT task_id as id, status, data, created_at, updated_at, duration, error_msg, retry_time, task_result, task_type FROM tasks WHERE status = %s",
+        "SELECT id, status, data, created_at, updated_at, duration, error_msg, retry_time, task_result, task_type FROM tasks WHERE status = %s",
         (status,),
     )
     rows = cursor.fetchall()
@@ -56,7 +56,7 @@ def get_tasks_by_status(status):
 def update_task_status(task_id, status):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE tasks SET status = %s WHERE task_id = %s", (status, task_id))
+    cursor.execute("UPDATE tasks SET status = %s WHERE id = %s", (status, task_id))
     conn.commit()
     cursor.close()
     conn.close()
@@ -67,7 +67,7 @@ def update_task(task_id, **kwargs):
         return
     set_clause = ", ".join(f"{k} = %s" for k in kwargs.keys())
     values = list(kwargs.values()) + [task_id]
-    query = f"UPDATE tasks SET {set_clause} WHERE task_id = %s"
+    query = f"UPDATE tasks SET {set_clause} WHERE id = %s"
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(query, values)

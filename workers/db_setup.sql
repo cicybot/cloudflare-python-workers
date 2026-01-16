@@ -6,7 +6,7 @@ USE tasks_db;
 
 -- Create tasks table
 CREATE TABLE IF NOT EXISTS tasks (
-    task_id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(36) PRIMARY KEY,
     status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
     data JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
