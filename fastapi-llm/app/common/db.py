@@ -8,8 +8,8 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
-# DATABASE_URL = "mysql+mysqlconnector://root:password@localhost:3306/mydatabase"
-DATABASE_URL = os.getenv("DATABASE_URL", None)
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+mysqlconnector://root:200898@localhost:3307/llm")
+
 if DATABASE_URL is not None:
     engine = create_engine(DATABASE_URL, echo=True)
 else:
