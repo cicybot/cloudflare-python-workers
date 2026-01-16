@@ -15,7 +15,7 @@ dependencies = [
 dev-dependencies = []
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+only-include = ["*.py", "*.json", "*.sql", "*.md"]
 
 [build-system]
 requires = ["hatchling"]
