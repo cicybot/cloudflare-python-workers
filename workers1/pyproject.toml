@@ -1,0 +1,21 @@
+[project]
+name = "workers-python"
+version = "0.1.0"
+description = "Cloudflare Workers Python TTS Task Runner"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "redis",
+    "soundfile",
+    "numpy",
+    "torch",
+    "voxcpm",
+    "indextts"
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

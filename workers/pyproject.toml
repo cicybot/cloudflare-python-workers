@@ -1,0 +1,18 @@
+[project]
+name = "workers-python"
+version = "0.1.0"
+description = "Cloudflare Workers Python Task Runner"
+dependencies = [
+    "redis",
+    "mysql-connector-python",
+    "fastapi",
+    "uvicorn",
+    "requests"
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

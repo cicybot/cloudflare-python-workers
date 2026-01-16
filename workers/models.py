@@ -1,0 +1,76 @@
+import mysql.connector
+import json
+import config
+import uuid
+
+
+def get_db_connection():
+    return mysql.connector.connect(
+        host=config.mysql_host,
+        user=config.mysql_user,
+        password=config.mysql_password,
+        database=config.mysql_database,
+    )
+
+
+def insert_task(task_data, task_type):
+    task_id = str(uuid.uuid4())
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO tasks (task_id, data, task_type) VALUES (%s, %s, %s)",
+        (task_id, json.dumps(task_data), task_type),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return task_id
+
+
+def get_task(task_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT task_id as id, status, data, created_at, updated_at, duration, error_msg, retry_time, task_result, task_type FROM tasks WHERE task_id = %s",
+        (task_id,),
+    )
+    task = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return task
+
+
+def get_tasks_by_status(status):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT task_id as id, status, data, created_at, updated_at, duration, error_msg, retry_time, task_result, task_type FROM tasks WHERE status = %s",
+        (status,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return rows
+
+
+def update_task_status(task_id, status):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE tasks SET status = %s WHERE task_id = %s", (status, task_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def update_task(task_id, **kwargs):
+    if not kwargs:
+        return
+    set_clause = ", ".join(f"{k} = %s" for k in kwargs.keys())
+    values = list(kwargs.values()) + [task_id]
+    query = f"UPDATE tasks SET {set_clause} WHERE task_id = %s"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(query, values)
+    conn.commit()
+    cursor.close()
+    conn.close()
