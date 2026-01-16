@@ -2,6 +2,9 @@
 
 This file provides guidance for agentic coding agents working in the workers-python repository. It includes build/lint/test commands, code style guidelines, and any specific rules.
 
+## Overview
+The workers-python project is a task processing system with an API server (FastAPI) that handles task submission, queuing (Redis), and storage (MySQL). Workers poll the API via HTTP to retrieve and update tasks, ensuring no direct database access by workers for better decoupling.
+
 ## Build/Lint/Test Commands
 
 ### Environment Setup
@@ -22,15 +25,16 @@ This file provides guidance for agentic coding agents working in the workers-pyt
 - Run all tests: `uv run python test_worker.py` (note: tests are not in a framework, just functions)
 - Run a single test: `uv run python -c "from test_worker import test_run_task; test_run_task()"`
 - For test_get_queue_length: `uv run python -c "from test_worker import test_get_queue_length; test_get_queue_length()"`
-- Database setup: Run `mysql -u root -p < db_setup.sql` to create tables
-- Start API: `uv run python api.py`
-- Start worker: `uv run python worker.py`
+- Database setup: Run `mysql -u root -p < db_setup.sql` to create tables (requires MySQL)
+- Start API: `uv run python api.py` (requires Redis and MySQL for full functionality)
+- Start worker: `python worker.py [worker_id]` (uses HTTP API only, no direct Redis/MySQL access)
 
 ### Running the Application
-- API server: `uv run uvicorn api:app --reload --host 0.0.0.0 --port 8000`
-- Worker: `uv run python worker.py`
-- Submit task: `curl -X POST http://localhost:8000/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
-- Get queue length: `curl http://localhost:8000/queue/length` (returns lengths for all types) or `curl "http://localhost:8000/queue/length?task_type=index-tts"`
+- API server: `uv run uvicorn api:app --reload --host 0.0.0.0 --port 8989`
+- Worker: `uv run python worker.py [worker_id]` (worker_id optional, defaults to UUID)
+- Submit task: `curl -X POST http://localhost:8989/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
+- Get queue length: `curl http://localhost:8989/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/queue/length?task_type=index-tts"`
+- Get queue length: `curl http://localhost:8989/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/queue/length?task_type=index-tts"`
 
 ## Code Style Guidelines
 
@@ -93,7 +97,7 @@ This file provides guidance for agentic coding agents working in the workers-pyt
 
 ### Asynchronous Code
 - Use async/await for I/O operations in API
-- Worker is synchronous for simplicity
+- Worker is synchronous and uses HTTP polling for task retrieval
 
 ### Security
 - Store secrets in config.py, not hardcoded
@@ -102,7 +106,7 @@ This file provides guidance for agentic coding agents working in the workers-pyt
 
 ### File Structure
 - api.py: FastAPI application and endpoints
-- worker.py: Worker logic for processing tasks
+- worker.py: Worker logic for processing tasks (HTTP-only, no direct DB/Redis)
 - models.py: Database models and operations
 - config.py: Configuration settings
 - test_worker.py: Test functions

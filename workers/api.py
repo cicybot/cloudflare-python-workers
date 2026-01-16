@@ -4,7 +4,7 @@ import json
 import base64
 import logging
 from pathlib import Path
-from worker import redis_client
+import redis
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +18,9 @@ logging.basicConfig(
     level=getattr(logging, config.log_level),
     format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(funcName)s - %(message)s",
 )
+
+# Redis client
+redis_client = redis.from_url(config.redis_url, decode_responses=True)
 
 
 app = FastAPI(title="API")
@@ -50,6 +53,22 @@ class UpdateTaskRequest(BaseModel):
     error_msg: Optional[str] = None
     retry_time: Optional[int] = None
     task_result: Optional[Dict[str, Any]] = None
+
+
+class RegisterWorkerRequest(BaseModel):
+    worker_id: str
+    platform: str
+    memory_total: int
+    memory_available: int
+    cpu_count: int
+    cpu_freq: float
+    gpu_info: Optional[str] = None
+
+
+class UpdateWorkerRequest(BaseModel):
+    worker_id: str
+    memory_available: Optional[int] = None
+    # Add other fields if needed
 
 
 # --------------------
@@ -394,6 +413,52 @@ async def update_task(req: UpdateTaskRequest):
     return response
 
 
+@app.post("/register_worker")
+async def register_worker(req: RegisterWorkerRequest):
+    logging.debug(f"Request body: {req.dict()}")
+    try:
+        models.insert_worker(
+            req.worker_id,
+            req.platform,
+            req.memory_total,
+            req.memory_available,
+            req.cpu_count,
+            req.cpu_freq,
+            req.gpu_info,
+        )
+        response = {"message": "Worker registered"}
+    except Exception as e:
+        if "Duplicate entry" in str(e):
+            # Worker already registered, update info
+            models.update_worker(
+                req.worker_id,
+                platform=req.platform,
+                memory_total=req.memory_total,
+                memory_available=req.memory_available,
+                cpu_count=req.cpu_count,
+                cpu_freq=req.cpu_freq,
+                gpu_info=req.gpu_info,
+            )
+            response = {"message": "Worker updated"}
+        else:
+            logging.error(f"Failed to register worker {req.worker_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to register worker")
+    logging.debug(f"Response: {response}")
+    return response
+
+
+@app.post("/update_worker")
+async def update_worker(req: UpdateWorkerRequest):
+    logging.debug(f"Request body: {req.dict()}")
+    kwargs = {}
+    if req.memory_available is not None:
+        kwargs["memory_available"] = req.memory_available
+    models.update_worker(req.worker_id, **kwargs)
+    response = {"message": "Worker updated"}
+    logging.debug(f"Response: {response}")
+    return response
+
+
 @app.get("/queue/length")
 async def get_queue_length(task_type: Optional[str] = None):
     logging.debug(f"Query params: task_type={task_type}")
@@ -407,6 +472,25 @@ async def get_queue_length(task_type: Optional[str] = None):
             queue_name = f"tasks:{t}"
             lengths[f"queue_length_{t}"] = redis_client.llen(queue_name)
         response = lengths
+    logging.debug(f"Response: {response}")
+    return response
+
+
+@app.get("/next_task")
+async def get_next_task(type: Optional[str] = None):
+    logging.debug(f"Getting next task for type: {type}")
+    import asyncio
+    if type:
+        queues =type
+    else:
+        queues = "test"
+    task = await asyncio.to_thread(redis_client.blpop, queues, 0)
+    if task:
+        queue_name, task_data_str = task
+        task_data = json.loads(task_data_str)
+        response = {"task": task_data}
+    else:
+        response = {"task": None}
     logging.debug(f"Response: {response}")
     return response
 

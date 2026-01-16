@@ -74,3 +74,45 @@ def update_task(task_id, **kwargs):
     conn.commit()
     cursor.close()
     conn.close()
+
+
+def insert_worker(
+    worker_id,
+    platform,
+    memory_total,
+    memory_available,
+    cpu_count,
+    cpu_freq,
+    gpu_info=None,
+):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO workers (id, platform, memory_total, memory_available, cpu_count, cpu_freq, gpu_info) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (
+            worker_id,
+            platform,
+            memory_total,
+            memory_available,
+            cpu_count,
+            cpu_freq,
+            gpu_info,
+        ),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def update_worker(worker_id, **kwargs):
+    if not kwargs:
+        return
+    set_clause = ", ".join(f"{k} = %s" for k in kwargs.keys())
+    values = list(kwargs.values()) + [worker_id]
+    query = f"UPDATE workers SET {set_clause} WHERE id = %s"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(query, values)
+    conn.commit()
+    cursor.close()
+    conn.close()

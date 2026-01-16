@@ -17,3 +17,15 @@ CREATE TABLE IF NOT EXISTS tasks (
     task_result JSON DEFAULT NULL,
     task_type VARCHAR(50) DEFAULT NULL
 );
+
+-- Create workers table
+CREATE TABLE IF NOT EXISTS workers (
+    id VARCHAR(50) PRIMARY KEY,
+    start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    platform VARCHAR(100),
+    memory_total BIGINT,
+    memory_available BIGINT,
+    cpu_count INT,
+    cpu_freq FLOAT,
+    gpu_info TEXT DEFAULT NULL
+);

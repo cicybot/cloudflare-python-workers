@@ -1,10 +1,13 @@
 import uuid
-import redis
 import logging
 import config
 import requests
 import json
 import time
+import sys
+import psutil
+import platform
+import threading
 
 
 def update_task_with_retry(task_id, data, max_retries=3):
@@ -28,22 +31,59 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(funcName)s - %(message)s",
 )
 
-# --------------------
-# Config loaded from config.py
-# --------------------
-redis_url = config.redis_url
+
+def heartbeat_worker(worker_id):
+    while True:
+        try:
+            memory = psutil.virtual_memory()
+            response = requests.post(
+                f"{config.api_url}/update_worker",
+                json={"worker_id": worker_id, "memory_available": memory.available},
+                timeout=5,
+            )
+            response.raise_for_status()
+            logging.debug(f"Worker {worker_id} heartbeat sent")
+        except Exception as e:
+            logging.error(f"Failed to send heartbeat for worker {worker_id}: {e}")
+        time.sleep(config.report_interval)
 
 
 # --------------------
 # Worker ID
 # --------------------
-WORKER_ID = str(uuid.uuid4())
+worker_id = sys.argv[1] if len(sys.argv) > 1 else str(uuid.uuid4())
+WORKER_ID = worker_id
 
-
-# --------------------
-# Redis client
-# --------------------
-redis_client = redis.from_url(redis_url, decode_responses=True)
+# Report worker info
+platform_info = platform.platform()
+memory = psutil.virtual_memory()
+cpu_count = psutil.cpu_count(logical=True)
+cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
+gpu_info = None  # TODO: Add GPU detection if needed
+try:
+    response = requests.post(
+        f"{config.api_url}/register_worker",
+        json={
+            "worker_id": worker_id,
+            "platform": platform_info,
+            "memory_total": memory.total,
+            "memory_available": memory.available,
+            "cpu_count": cpu_count,
+            "cpu_freq": cpu_freq,
+            "gpu_info": gpu_info,
+        },
+        timeout=5,
+    )
+    response.raise_for_status()
+    logging.info(f"Worker {worker_id} registered with system info")
+    # Start heartbeat thread
+    heartbeat_thread = threading.Thread(
+        target=heartbeat_worker, args=(worker_id,), daemon=True
+    )
+    heartbeat_thread.start()
+except Exception as e:
+    logging.error(f"Failed to register worker {worker_id}: {e}")
+    sys.exit(1)
 
 
 def run_task(task_data):
@@ -115,20 +155,29 @@ def run_task(task_data):
 
 
 def run_tasks():
-    logging.info(f"Worker {WORKER_ID} started and waiting for tasks...")
+    logging.info(f"Worker {WORKER_ID} started and polling for tasks...")
     while True:
-        # Listen to multiple queues
-        task = redis_client.blpop(["tasks:index-tts", "tasks:voxcpm"], 0)
-        if task:
-            queue_name, task_data_str = task
-            task_data = json.loads(task_data_str)
-            pop_ts = time.time()
-            push_ts = task_data.get("push_ts", pop_ts)
-            queue_duration = pop_ts - push_ts
-            logging.info(
-                f"Received task from {queue_name} after {queue_duration:.2f}s in queue: {task_data}"
-            )
-            run_task(task_data)
+        try:
+            response = requests.get(f"{config.api_url}/next_task", timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            if data["task"]:
+                task_data = data["task"]
+                pop_ts = time.time()
+                push_ts = task_data.get("push_ts", pop_ts)
+                queue_duration = pop_ts - push_ts
+                logging.info(
+                    f"Received task after {queue_duration:.2f}s in queue: {task_data}"
+                )
+                run_task(task_data)
+            else:
+                time.sleep(config.poll_interval)
+        except requests.RequestException as e:
+            logging.warning(f"Error polling for tasks, retrying: {e}")
+            time.sleep(1)  # Short retry delay
+        except requests.RequestException as e:
+            logging.error(f"Error polling for tasks: {e}")
+            time.sleep(config.poll_interval)
 
 
 # --------------------

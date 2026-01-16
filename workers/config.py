@@ -11,3 +11,7 @@ mysql_database = os.getenv("MYSQL_DATABASE", "tasks_db")
 
 # API config
 api_url = os.getenv("API_URL", "http://localhost:8989")
+
+# Worker config
+report_interval = int(os.getenv("REPORT_INTERVAL", "5"))
+poll_interval = int(os.getenv("POLL_INTERVAL", "1"))
