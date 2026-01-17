@@ -5,7 +5,7 @@ This file provides guidance for agentic coding agents working in the workers-pyt
 ## Overview
 The workers-python project is a task processing system with an API server (FastAPI) that handles task submission, queuing (Redis), and storage (MySQL). Workers poll the API via HTTP to retrieve and update tasks, ensuring no direct database access by workers for better decoupling.
 
-Task types use unified Redis queues named "tasks:{task_type}", where task_type is a string identifier (e.g., "tts" for TTS tasks, "whisper" for Whisper tasks).
+Task types use unified Redis queues named "tasks:{task_type}", where task_type is a string identifier (e.g., "test" for TTS tasks, "whisper" for Whisper transcription tasks).
 
 ## Build/Lint/Test Commands
 
@@ -33,9 +33,13 @@ Task types use unified Redis queues named "tasks:{task_type}", where task_type i
 
 ### Running the Application
 - API server: `uv run uvicorn api:app --reload --host 0.0.0.0 --port 8989`
-- Worker: `uv run python worker.py [worker_id]` (worker_id optional, defaults to UUID)
-- Submit task: `curl -X POST http://localhost:8989/api/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
-- Get queue length: `curl http://localhost:8989/api/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/api/queue/length?task_type=index-tts"`
+- Worker (TTS): `uv run python worker.py [worker_id]` (worker_id optional, defaults to UUID)
+- Worker (Whisper): `uv run python worker-whisper.py [worker_id]` (worker_id optional, defaults to UUID)
+- Submit TTS task: `curl -X POST http://localhost:8989/api/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
+- Submit Whisper audio from URL: `curl -X POST http://localhost:8989/api/whisper/audio/url -H "Content-Type: application/json" -d '{"url": "https://example.com/audio.mp3"}'`
+- Submit Whisper video from URL: `curl -X POST http://localhost:8989/api/whisper/video/url -H "Content-Type: application/json" -d '{"url": "https://example.com/video.mp4"}'`
+- Submit Whisper audio file: First upload file via `curl -X POST http://localhost:8989/api/upload -F "file=@audio.wav"`, then submit with rel_path from response.
+- Get queue length: `curl http://localhost:8989/api/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/api/queue/length?task_type=test"` or `curl "http://localhost:8989/api/queue/length?task_type=whisper"`
 
 ## Code Style Guidelines
 

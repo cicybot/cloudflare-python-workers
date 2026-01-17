@@ -1,5 +1,5 @@
 import json
-from worker import run_task, run_tasks, redis_client
+from worker import redis_client
 
 
 def test_run_task():

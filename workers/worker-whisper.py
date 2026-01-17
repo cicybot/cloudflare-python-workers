@@ -2,7 +2,6 @@ import uuid
 import logging
 import config
 import requests
-import json
 import time
 import sys
 import psutil
@@ -54,8 +53,9 @@ memory = psutil.virtual_memory()
 cpu_count = psutil.cpu_count(logical=True)
 cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
 gpu_info = None  # TODO: Add GPU detection if needed
-try:
-    response = requests.post(
+while True:
+    try:
+        response = requests.post(
             f"{config.api_url}/api/register_worker",
             json={
                 "worker_id": worker_id,
@@ -68,16 +68,19 @@ try:
             },
             timeout=5,
         )
-    response.raise_for_status()
-    logging.info(f"Worker {worker_id} registered with system info")
-    # Start heartbeat thread
-    heartbeat_thread = threading.Thread(
-        target=heartbeat_worker, args=(worker_id,), daemon=True
-    )
-    heartbeat_thread.start()
-except Exception as e:
-    logging.error(f"Failed to register worker {worker_id}: {e}")
-    sys.exit(1)
+        response.raise_for_status()
+        logging.info(f"Worker {worker_id} registered with system info")
+        # Start heartbeat thread
+        heartbeat_thread = threading.Thread(
+            target=heartbeat_worker, args=(worker_id,), daemon=True
+        )
+        heartbeat_thread.start()
+        break  # Success, exit loop
+    except Exception as e:
+        logging.warning(
+            f"Failed to register worker {worker_id}: {e}. Retrying in 5 seconds..."
+        )
+        time.sleep(5)  # Wait before retry
 
 
 def run_task(task_data):
@@ -105,44 +108,66 @@ def run_task(task_data):
             return
 
     try:
-        if task_type == "whisper-audio-url":
-            url = payload["url"]
-            # download file
-            r = req.get(url, stream=True)
-            r.raise_for_status()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".audio") as tmp:
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-                tmp_path = tmp.name
-        elif task_type == "whisper-video-url":
-            url = payload["url"]
-            # download video
-            r = req.get(url, stream=True)
-            r.raise_for_status()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp_video.write(chunk)
-                video_path = tmp_video.name
-            # convert to audio
-            audio_fd, audio_path = tempfile.mkstemp(suffix=".mp3")
-            os.close(audio_fd)
-            cmd = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                video_path,
-                "-vn",
-                "-acodec",
-                "libmp3lame",
-                "-q:a",
-                "2",
-                audio_path,
-            ]
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            tmp_path = audio_path
-        elif task_type == "whisper-audio-data":
-            rel_path = payload["rel_path"]
-            tmp_path = os.path.join(config.media_path, rel_path)
+        if task_type == "whisper":
+            if "url" in payload:
+                url = payload["url"]
+                # Determine if video based on URL extension
+                video_extensions = [
+                    ".mp4",
+                    ".avi",
+                    ".mov",
+                    ".mkv",
+                    ".webm",
+                    ".flv",
+                    ".wmv",
+                ]
+                is_video = any(url.lower().endswith(ext) for ext in video_extensions)
+                if is_video:
+                    # download video
+                    r = req.get(url, stream=True)
+                    r.raise_for_status()
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".mp4"
+                    ) as tmp_video:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            tmp_video.write(chunk)
+                        video_path = tmp_video.name
+                    # convert to audio
+                    audio_fd, audio_path = tempfile.mkstemp(suffix=".mp3")
+                    os.close(audio_fd)
+                    cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        video_path,
+                        "-vn",
+                        "-acodec",
+                        "libmp3lame",
+                        "-q:a",
+                        "2",
+                        audio_path,
+                    ]
+                    subprocess.run(
+                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                    tmp_path = audio_path
+                    # Clean up video file
+                    os.unlink(video_path)
+                else:
+                    # download audio
+                    r = req.get(url, stream=True)
+                    r.raise_for_status()
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".audio"
+                    ) as tmp:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            tmp.write(chunk)
+                        tmp_path = tmp.name
+            elif "rel_path" in payload:
+                rel_path = payload["rel_path"]
+                tmp_path = os.path.join(config.media_path, rel_path)
+            else:
+                raise ValueError("Invalid payload for whisper task")
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 

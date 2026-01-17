@@ -2,7 +2,6 @@ import uuid
 import logging
 import config
 import requests
-import json
 import time
 import sys
 import psutil
@@ -60,30 +59,34 @@ memory = psutil.virtual_memory()
 cpu_count = psutil.cpu_count(logical=True)
 cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
 gpu_info = None  # TODO: Add GPU detection if needed
-try:
-    response = requests.post(
-        f"{config.api_url}/api/register_worker",
-        json={
-            "worker_id": worker_id,
-            "platform": platform_info,
-            "memory_total": memory.total,
-            "memory_available": memory.available,
-            "cpu_count": cpu_count,
-            "cpu_freq": cpu_freq,
-            "gpu_info": gpu_info,
-        },
-        timeout=5,
-    )
-    response.raise_for_status()
-    logging.info(f"Worker {worker_id} registered with system info")
-    # Start heartbeat thread
-    heartbeat_thread = threading.Thread(
-        target=heartbeat_worker, args=(worker_id,), daemon=True
-    )
-    heartbeat_thread.start()
-except Exception as e:
-    logging.error(f"Failed to register worker {worker_id}: {e}")
-    sys.exit(1)
+while True:
+    try:
+        response = requests.post(
+            f"{config.api_url}/api/register_worker",
+            json={
+                "worker_id": worker_id,
+                "platform": platform_info,
+                "memory_total": memory.total,
+                "memory_available": memory.available,
+                "cpu_count": cpu_count,
+                "cpu_freq": cpu_freq,
+                "gpu_info": gpu_info,
+            },
+            timeout=5,
+        )
+        response.raise_for_status()
+        logging.info(f"Worker {worker_id} registered with system info")
+        # Start heartbeat thread
+        heartbeat_thread = threading.Thread(
+            target=heartbeat_worker, args=(worker_id,), daemon=True
+        )
+        heartbeat_thread.start()
+        break  # Success, exit loop
+    except Exception as e:
+        logging.warning(
+            f"Failed to register worker {worker_id}: {e}. Retrying in 5 seconds..."
+        )
+        time.sleep(5)  # Wait before retry
 
 
 def run_task(task_data):
