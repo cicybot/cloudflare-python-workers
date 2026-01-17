@@ -7,8 +7,9 @@ import redis
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 import models
 import config
 
@@ -34,12 +35,56 @@ app.add_middleware(
 
 
 class TTSRequest(BaseModel):
-    params: Dict[str, Any]
+    params: Dict[str, Any] = Field(
+        description="Parameters for TTS inference, passed directly to the TTS model."
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "params": {"text": "Hello, world!", "voice": "en-US-1", "speed": 1.0}
+            }
+        }
+    )
 
 
 class TasksResponse(BaseModel):
     total: int
     tasks: List[Dict[str, Any]]
+
+
+class WorkerModel(BaseModel):
+    id: str = Field(..., description="Unique identifier for the worker")
+    platform: str = Field(..., description="Operating system and platform information")
+    memory_total: int = Field(..., description="Total memory in bytes")
+    memory_available: int = Field(..., description="Available memory in bytes")
+    cpu_count: int = Field(..., description="Number of CPU cores")
+    cpu_freq: float = Field(..., description="CPU frequency in MHz")
+    gpu_info: Optional[str] = Field(None, description="GPU information if available")
+    start_time: Optional[datetime] = Field(
+        None, description="Worker registration timestamp"
+    )
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "worker-123",
+                "platform": "Linux-5.4.0-x86_64-with-glibc2.29",
+                "memory_total": 8589934592,
+                "memory_available": 4294967296,
+                "cpu_count": 4,
+                "cpu_freq": 2200.0,
+                "gpu_info": "NVIDIA GeForce GTX 1060",
+                "start_time": None,
+                "updated_at": None,
+            }
+        }
+    )
+
+
+class WorkersResponse(BaseModel):
+    workers: List[WorkerModel]
 
 
 class UpdateTaskRequest(BaseModel):
@@ -53,13 +98,31 @@ class UpdateTaskRequest(BaseModel):
 
 
 class RegisterWorkerRequest(BaseModel):
-    worker_id: str
-    platform: str
-    memory_total: int
-    memory_available: int
-    cpu_count: int
-    cpu_freq: float
-    gpu_info: Optional[str] = None
+    worker_id: str = Field(..., description="Unique identifier for the worker instance")
+    platform: str = Field(..., description="Operating system and platform details")
+    memory_total: int = Field(..., description="Total system memory in bytes")
+    memory_available: int = Field(
+        ..., description="Currently available memory in bytes"
+    )
+    cpu_count: int = Field(..., description="Number of CPU cores available")
+    cpu_freq: float = Field(..., description="CPU clock frequency in MHz")
+    gpu_info: Optional[str] = Field(
+        None, description="GPU hardware information, if available"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "worker_id": "worker-001",
+                "platform": "Linux-5.4.0-x86_64-with-glibc2.29",
+                "memory_total": 8589934592,
+                "memory_available": 4294967296,
+                "cpu_count": 4,
+                "cpu_freq": 2200.0,
+                "gpu_info": "NVIDIA GeForce GTX 1060",
+            }
+        }
+    )
 
 
 class UpdateWorkerRequest(BaseModel):
@@ -418,7 +481,12 @@ async def update_task(req: UpdateTaskRequest):
     return response
 
 
-@app.post("/api/register_worker", tags=["Internal"])
+@app.post(
+    "/api/register_worker",
+    tags=["Internal"],
+    summary="Register or update a worker",
+    description="Registers a new worker or updates an existing one with system information including platform, memory, CPU, and GPU details.",
+)
 async def register_worker(req: RegisterWorkerRequest):
     logging.debug(f"Request body: {req.dict()}")
     try:
@@ -431,28 +499,20 @@ async def register_worker(req: RegisterWorkerRequest):
             req.cpu_freq,
             req.gpu_info,
         )
-        response = {"message": "Worker registered"}
+        response = {"message": "Worker registered or updated"}
     except Exception as e:
-        if "Duplicate entry" in str(e):
-            # Worker already registered, update info
-            models.update_worker(
-                req.worker_id,
-                platform=req.platform,
-                memory_total=req.memory_total,
-                memory_available=req.memory_available,
-                cpu_count=req.cpu_count,
-                cpu_freq=req.cpu_freq,
-                gpu_info=req.gpu_info,
-            )
-            response = {"message": "Worker updated"}
-        else:
-            logging.error(f"Failed to register worker {req.worker_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to register worker")
+        logging.error(f"Error registering worker: {e}")
+        raise HTTPException(status_code=500, detail="Failed to register worker")
     logging.debug(f"Response: {response}")
     return response
 
 
-@app.post("/api/update_worker", tags=["Internal"])
+@app.post(
+    "/api/update_worker",
+    tags=["Internal"],
+    summary="Update worker heartbeat",
+    description="Updates a worker's available memory information for heartbeat monitoring.",
+)
 async def update_worker(req: UpdateWorkerRequest):
     logging.debug(f"Request body: {req.dict()}")
     kwargs = {}
@@ -462,6 +522,18 @@ async def update_worker(req: UpdateWorkerRequest):
     response = {"message": "Worker updated"}
     logging.debug(f"Response: {response}")
     return response
+
+
+@app.get(
+    "/api/workers",
+    tags=["Internal"],
+    summary="Get all registered workers",
+    description="Returns a list of all workers currently registered in the system, including their platform, memory, CPU, and GPU information.",
+    response_model=WorkersResponse,
+)
+async def get_workers():
+    workers = models.get_all_workers()
+    return {"workers": workers}
 
 
 @app.post(
@@ -547,8 +619,18 @@ async def get_queue_length(task_type: Optional[str] = None):
     return response
 
 
-@app.get("/api/next_task", tags=["Queue"])
-async def get_next_task(task_type: Optional[str] = None):
+@app.get(
+    "/api/next_task",
+    tags=["Queue"],
+    summary="Get next pending task",
+    description="Retrieves the next pending task from the queue, optionally filtered by task type. The task status is automatically updated to 'processing'.",
+)
+async def get_next_task(
+    task_type: Optional[str] = Query(
+        None,
+        description="Filter tasks by type (e.g., 'test' for TTS, 'whisper' for transcription). If not specified, returns the next task of any type.",
+    ),
+):
     logging.debug(f"Getting next task for type: {task_type}")
     import asyncio
 
@@ -634,10 +716,17 @@ async def submit_whisper_audio_data(file: UploadFile = File(...)):
 # --------------------
 if __name__ == "__main__":
     import uvicorn
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run the API server")
+    parser.add_argument(
+        "--port", type=int, default=8989, help="Port to run the server on"
+    )
+    args = parser.parse_args()
 
     uvicorn.run(
         "api:app",  # 注意这里用字符串：模块名:app
         host="127.0.0.1",
-        port=8989,
+        port=args.port,
         # reload=True,  # 开启自动重载
     )

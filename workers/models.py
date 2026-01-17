@@ -88,7 +88,7 @@ def insert_worker(
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO workers (id, platform, memory_total, memory_available, cpu_count, cpu_freq, gpu_info) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        "INSERT INTO workers (id, platform, memory_total, memory_available, cpu_count, cpu_freq, gpu_info) VALUES (%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE platform=VALUES(platform), memory_total=VALUES(memory_total), memory_available=VALUES(memory_available), cpu_count=VALUES(cpu_count), cpu_freq=VALUES(cpu_freq), gpu_info=VALUES(gpu_info)",
         (
             worker_id,
             platform,
@@ -116,3 +116,12 @@ def update_worker(worker_id, **kwargs):
     conn.commit()
     cursor.close()
     conn.close()
+
+
+def get_all_workers():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM workers")
+    workers = cursor.fetchall()
+    conn.close()
+    return workers

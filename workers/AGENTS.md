@@ -27,12 +27,12 @@ Task types use unified Redis queues named "tasks:{task_type}", where task_type i
 - Run all tests: `uv run python test_worker.py` (note: tests are not in a framework, just functions)
 - Run a single test: `uv run python -c "from test_worker import test_run_task; test_run_task()"`
 - For test_get_queue_length: `uv run python -c "from test_worker import test_get_queue_length; test_get_queue_length()"`
-- Database setup: Run `mysql -u root -p < db_setup.sql` to create tables (requires MySQL)
+- Database setup: Run `mysql -u root -p < db_setup.sql` to create tables and indexes (requires MySQL)
 - Start API: `uv run python api.py` (requires Redis and MySQL for full functionality)
 - Start worker: `python worker.py [worker_id]` (uses HTTP API only, no direct Redis/MySQL access)
 
 ### Running the Application
-- API server: `uv run uvicorn api:app --reload --host 0.0.0.0 --port 8989`
+- API server: `uv run uvicorn api:app --reload --host 0.0.0.0 --port 8989` or `python api.py --port 8080` (configurable port)
 - Worker (TTS): `uv run python worker.py [worker_id]` (worker_id optional, defaults to UUID)
 - Worker (Whisper): `uv run python worker-whisper.py [worker_id]` (worker_id optional, defaults to UUID)
 - Submit TTS task: `curl -X POST http://localhost:8989/api/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
@@ -40,6 +40,7 @@ Task types use unified Redis queues named "tasks:{task_type}", where task_type i
 - Submit Whisper video from URL: `curl -X POST http://localhost:8989/api/whisper/video/url -H "Content-Type: application/json" -d '{"url": "https://example.com/video.mp4"}'`
 - Submit Whisper audio file: First upload file via `curl -X POST http://localhost:8989/api/upload -F "file=@audio.wav"`, then submit with rel_path from response.
 - Get queue length: `curl http://localhost:8989/api/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/api/queue/length?task_type=test"` or `curl "http://localhost:8989/api/queue/length?task_type=whisper"`
+- Get workers: `curl http://localhost:8989/api/workers` (returns list of registered workers)
 
 ## Code Style Guidelines
 

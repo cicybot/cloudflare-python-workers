@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS workers (
     id VARCHAR(50) PRIMARY KEY,
     start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     platform VARCHAR(100),
     memory_total BIGINT,
     memory_available BIGINT,
@@ -29,3 +30,6 @@ CREATE TABLE IF NOT EXISTS workers (
     cpu_freq FLOAT,
     gpu_info TEXT DEFAULT NULL
 );
+
+-- Indexes for performance
+CREATE INDEX idx_tasks_status_type_created ON tasks (status, task_type, created_at);
