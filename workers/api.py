@@ -637,7 +637,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "api:app",  # 注意这里用字符串：模块名:app
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8989,
-        reload=True,  # 开启自动重载
+        # reload=True,  # 开启自动重载
     )
