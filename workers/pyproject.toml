@@ -8,7 +8,8 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "requests",
-    "psutil"
+    "psutil",
+    "python-multipart>=0.0.21",
 ]
 
 readme = "README.md"

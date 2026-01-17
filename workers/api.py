@@ -3,9 +3,10 @@ import uuid
 import json
 import base64
 import logging
+import os
 from pathlib import Path
 import redis
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.responses import RedirectResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,6 @@ logging.basicConfig(
 
 # Redis client
 redis_client = redis.from_url(config.redis_url, decode_responses=True)
-
 
 app = FastAPI(title="API")
 
@@ -71,6 +71,10 @@ class UpdateWorkerRequest(BaseModel):
     # Add other fields if needed
 
 
+class WhisperRequest(BaseModel):
+    url: str
+
+
 # --------------------
 # Frontend served at /
 # API docs at /docs
@@ -86,7 +90,8 @@ class UpdateWorkerRequest(BaseModel):
 # IndexTTS 提交接口 (原 /tts，现在重命名为 /tts/index-tts)
 # --------------------
 @app.post(
-    "/tts/index-tts",
+    "/api/tts/index-tts",
+    tags=["TTS"],
     summary="Submit IndexTTS task",
     description="""
 提交IndexTTS任务。`params` 参数会直接传给 `IndexTTS2.infer()`。
@@ -141,7 +146,7 @@ async def submit_index_tts(req: TTSRequest):
     retry_time = task_info.get("retry_time", 3) if task_info else 3
 
     # Push to Redis
-    queue_name = "tasks:index-tts"
+    queue_name = "tasks:tts"
     task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time}
     try:
         redis_client.lpush(queue_name, json.dumps(task_for_queue))
@@ -164,7 +169,8 @@ async def submit_index_tts(req: TTSRequest):
 # VoxCPM 提交接口
 # --------------------
 @app.post(
-    "/tts/voxcpm",
+    "/api/tts/voxcpm",
+    tags=["TTS"],
     summary="Submit VoxCPM task",
     description="""
 提交VoxCPM任务。`params` 参数会直接传给 `VoxCPM.generate()`。
@@ -213,7 +219,7 @@ async def submit_voxcpm_tts(req: TTSRequest):
     retry_time = task_info.get("retry_time", 3) if task_info else 3
 
     # Push to Redis
-    queue_name = "tasks:voxcpm"
+    queue_name = "tasks:tts"
     task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time}
     try:
         redis_client.lpush(queue_name, json.dumps(task_for_queue))
@@ -228,7 +234,8 @@ async def submit_voxcpm_tts(req: TTSRequest):
 
 
 @app.get(
-    "/tts/{task_id}",
+    "/api/tts/{task_id}",
+    tags=["Tasks"],
     summary="Get a specific TTS task by ID",
     description="""
 Get details of a specific TTS task by its ID.
@@ -307,7 +314,8 @@ def get_task(task_id: str):
 
 
 @app.get(
-    "/tasks",
+    "/api/tasks",
+    tags=["Tasks"],
     response_model=TasksResponse,
     summary="Get TTS tasks filtered by status",
     description="""
@@ -393,7 +401,7 @@ def get_all_tasks(
     return response
 
 
-@app.post("/update_task")
+@app.post("/api/update_task", tags=["Internal"])
 async def update_task(req: UpdateTaskRequest):
     logging.debug(f"Request body: {req.dict()}")
     kwargs = {}
@@ -413,7 +421,7 @@ async def update_task(req: UpdateTaskRequest):
     return response
 
 
-@app.post("/register_worker")
+@app.post("/api/register_worker", tags=["Internal"])
 async def register_worker(req: RegisterWorkerRequest):
     logging.debug(f"Request body: {req.dict()}")
     try:
@@ -447,7 +455,7 @@ async def register_worker(req: RegisterWorkerRequest):
     return response
 
 
-@app.post("/update_worker")
+@app.post("/api/update_worker", tags=["Internal"])
 async def update_worker(req: UpdateWorkerRequest):
     logging.debug(f"Request body: {req.dict()}")
     kwargs = {}
@@ -459,32 +467,96 @@ async def update_worker(req: UpdateWorkerRequest):
     return response
 
 
-@app.get("/queue/length")
+@app.post(
+    "/api/upload",
+    tags=["Files"],
+    summary="Upload a file",
+    description="""
+Upload a file to the media directory.
+
+- **file**: The file to upload (binary data).
+- **rel_path**: Optional relative path within the media directory (e.g., "images/"). Must not contain ".." for security.
+
+The file is saved to `{media_path}/{rel_path}/{filename}`. Returns a download URL.
+""",
+)
+async def upload_file(file: UploadFile = File(...), rel_path: str = ""):
+    if ".." in rel_path:
+        raise HTTPException(status_code=400, detail="Invalid rel_path: contains '..'")
+    file_size = 0
+    content = await file.read()
+    file_size = len(content)
+    if file_size > config.max_upload_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {file_size} bytes > {config.max_upload_size} bytes",
+        )
+    logging.debug(
+        f"Uploading file: {file.filename}, rel_path: {rel_path}, size: {file_size}"
+    )
+    os.makedirs(config.media_path, exist_ok=True)
+    file_path = (
+        os.path.join(config.media_path, rel_path, file.filename)
+        if rel_path
+        else os.path.join(config.media_path, file.filename)
+    )
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "wb") as f:
+        f.write(content)
+    rel_path = os.path.relpath(file_path, config.media_path)
+    url = f"{config.upload_base_url}/file?path={rel_path}"
+    response = {"message": "File uploaded", "url": url}
+    logging.debug(f"Response: {response}")
+    return response
+
+
+@app.get(
+    "/api/file",
+    tags=["Files"],
+    summary="Download a file",
+    description="""
+Download a file from the media directory.
+
+- **path**: The relative path to the file within the media directory (e.g., "images/photo.jpg"). Must not contain ".." for security.
+
+Returns the file as a binary response.
+""",
+)
+async def get_file(path: str):
+    if ".." in path:
+        raise HTTPException(status_code=400, detail="Invalid path: contains '..'")
+    logging.debug(f"Requesting file: {path}")
+    full_path = os.path.join(config.media_path, path)
+    if os.path.exists(full_path):
+        return FileResponse(full_path)
+    else:
+        raise HTTPException(status_code=404, detail="File not found")
+
+
+@app.get("/api/queue/length", tags=["Queue"])
 async def get_queue_length(task_type: Optional[str] = None):
     logging.debug(f"Query params: task_type={task_type}")
     if task_type:
-        queue_name = f"tasks:{task_type}"
-        length = redis_client.llen(queue_name)
+        queue = config.get_queue_for_task_type(task_type)
+        length = redis_client.llen(queue)
         response = {f"queue_length_{task_type}": length}
     else:
         lengths = {}
-        for t in ["index-tts", "voxcpm"]:
-            queue_name = f"tasks:{t}"
-            lengths[f"queue_length_{t}"] = redis_client.llen(queue_name)
+        for t in ["test", "whisper"]:
+            queue = config.get_queue_for_task_type(t)
+            lengths[f"queue_length_{t}"] = redis_client.llen(queue)
         response = lengths
     logging.debug(f"Response: {response}")
     return response
 
 
-@app.get("/next_task")
-async def get_next_task(type: Optional[str] = None):
-    logging.debug(f"Getting next task for type: {type}")
+@app.get("/api/next_task", tags=["Queue"])
+async def get_next_task(task_type: Optional[str] = None):
+    logging.debug(f"Getting next task for type: {task_type}")
     import asyncio
-    if type:
-        queues =type
-    else:
-        queues = "test"
-    task = await asyncio.to_thread(redis_client.blpop, queues, 0)
+
+    queue = config.get_queue_for_task_type(task_type)
+    task = await asyncio.to_thread(redis_client.blpop, queue, 0)
     if task:
         queue_name, task_data_str = task
         task_data = json.loads(task_data_str)
@@ -493,6 +565,71 @@ async def get_next_task(type: Optional[str] = None):
         response = {"task": None}
     logging.debug(f"Response: {response}")
     return response
+
+
+@app.post("/api/whisper/audio/url", tags=["Whisper"])
+async def submit_whisper_audio_url(req: WhisperRequest):
+    logging.debug(f"Request body: {req.dict()}")
+    task_id = models.insert_task({"url": req.url}, "whisper-audio-url")
+    queue_name = "tasks:whisper"
+    task_for_queue = {
+        "id": task_id,
+        "payload": {"url": req.url},
+        "task_type": "whisper-audio-url",
+        "retry_time": 3,
+    }
+    try:
+        redis_client.lpush(queue_name, json.dumps(task_for_queue))
+        print(f"DEBUG: Created Whisper Audio URL task {task_id}")
+        return {"task_id": task_id}
+    except Exception as e:
+        logging.error(f"Failed to submit whisper task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue task")
+
+
+@app.post("/api/whisper/video/url", tags=["Whisper"])
+async def submit_whisper_video_url(req: WhisperRequest):
+    logging.debug(f"Request body: {req.dict()}")
+    task_id = models.insert_task({"url": req.url}, "whisper-video-url")
+    queue_name = "tasks:whisper"
+    task_for_queue = {
+        "id": task_id,
+        "payload": {"url": req.url},
+        "task_type": "whisper-video-url",
+        "retry_time": 3,
+    }
+    try:
+        redis_client.lpush(queue_name, json.dumps(task_for_queue))
+        print(f"DEBUG: Created Whisper Video URL task {task_id}")
+        return {"task_id": task_id}
+    except Exception as e:
+        logging.error(f"Failed to submit whisper task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue task")
+
+
+@app.post("/api/whisper/audio/data", tags=["Whisper"])
+async def submit_whisper_audio_data(file: UploadFile = File(...)):
+    logging.debug(f"Uploading file: {file.filename}")
+    os.makedirs(config.media_path, exist_ok=True)
+    file_path = os.path.join(config.media_path, file.filename)
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+    rel_path = os.path.relpath(file_path, config.media_path)
+    task_id = models.insert_task({"rel_path": rel_path}, "whisper-audio-data")
+    queue_name = "tasks:whisper"
+    task_for_queue = {
+        "id": task_id,
+        "payload": {"rel_path": rel_path},
+        "task_type": "whisper-audio-data",
+        "retry_time": 3,
+    }
+    try:
+        redis_client.lpush(queue_name, json.dumps(task_for_queue))
+        print(f"DEBUG: Created Whisper Audio Data task {task_id}")
+        return {"task_id": task_id}
+    except Exception as e:
+        logging.error(f"Failed to submit whisper task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue task")
 
 
 # --------------------

@@ -5,6 +5,8 @@ This file provides guidance for agentic coding agents working in the workers-pyt
 ## Overview
 The workers-python project is a task processing system with an API server (FastAPI) that handles task submission, queuing (Redis), and storage (MySQL). Workers poll the API via HTTP to retrieve and update tasks, ensuring no direct database access by workers for better decoupling.
 
+Task types use unified Redis queues named "tasks:{task_type}", where task_type is a string identifier (e.g., "tts" for TTS tasks, "whisper" for Whisper tasks).
+
 ## Build/Lint/Test Commands
 
 ### Environment Setup
@@ -32,9 +34,8 @@ The workers-python project is a task processing system with an API server (FastA
 ### Running the Application
 - API server: `uv run uvicorn api:app --reload --host 0.0.0.0 --port 8989`
 - Worker: `uv run python worker.py [worker_id]` (worker_id optional, defaults to UUID)
-- Submit task: `curl -X POST http://localhost:8989/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
-- Get queue length: `curl http://localhost:8989/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/queue/length?task_type=index-tts"`
-- Get queue length: `curl http://localhost:8989/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/queue/length?task_type=index-tts"`
+- Submit task: `curl -X POST http://localhost:8989/api/tts/index-tts -H "Content-Type: application/json" -d '{"params": {"text": "hello"}}'`
+- Get queue length: `curl http://localhost:8989/api/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/api/queue/length?task_type=index-tts"`
 
 ## Code Style Guidelines
 

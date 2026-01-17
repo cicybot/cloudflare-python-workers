@@ -61,9 +61,9 @@ cpu_count = psutil.cpu_count(logical=True)
 cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
 gpu_info = None  # TODO: Add GPU detection if needed
 try:
-    response = requests.post(
-        f"{config.api_url}/register_worker",
-        json={
+        response = requests.post(
+            f"{config.api_url}/api/register_worker",
+            json={
             "worker_id": worker_id,
             "platform": platform_info,
             "memory_total": memory.total,
@@ -117,6 +117,7 @@ def run_task(task_data):
             # Calculate duration and set result
             end_time = time.time()
             duration = end_time - start_time
+
             task_result = {"output": "processed", "duration": duration}
 
             # Update status to completed with additional fields
@@ -158,7 +159,9 @@ def run_tasks():
     logging.info(f"Worker {WORKER_ID} started and polling for tasks...")
     while True:
         try:
-            response = requests.get(f"{config.api_url}/next_task", timeout=5)
+            response = requests.get(
+                f"{config.api_url}/api/next_task?task_type=test", timeout=5
+            )
             response.raise_for_status()
             data = response.json()
             if data["task"]:
