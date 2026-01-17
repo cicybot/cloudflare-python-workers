@@ -6,7 +6,7 @@ import time
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from utils_worker import update_task_with_retry, register_worker
 
 

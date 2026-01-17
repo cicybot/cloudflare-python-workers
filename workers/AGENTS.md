@@ -113,7 +113,7 @@ Task types use unified Redis queues named "tasks:{task_type}", where task_type i
 - api.py: FastAPI application and endpoints
 - worker.py: Worker logic for processing TTS tasks (HTTP-only, no direct DB/Redis)
 - worker-whisper.py: Worker logic for processing Whisper transcription tasks (HTTP-only, no direct DB/Redis)
-- utils-worker.py: Shared utilities for workers (registration, heartbeat, retry logic)
+- utils_worker.py: Shared utilities for workers (registration, heartbeat, retry logic)
 - models.py: Database models and operations
 - config.py: Configuration settings
 - test_worker.py: Test functions
