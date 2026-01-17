@@ -570,7 +570,7 @@ async def get_next_task(task_type: Optional[str] = None):
 @app.post("/api/whisper/audio/url", tags=["Whisper"])
 async def submit_whisper_audio_url(req: WhisperRequest):
     logging.debug(f"Request body: {req.dict()}")
-    task_id = models.insert_task({"url": req.url}, "whisper-audio-url")
+    task_id = models.insert_task({"url": req.url}, "whisper")
     queue_name = "tasks:whisper"
     task_for_queue = {
         "id": task_id,
@@ -590,7 +590,7 @@ async def submit_whisper_audio_url(req: WhisperRequest):
 @app.post("/api/whisper/video/url", tags=["Whisper"])
 async def submit_whisper_video_url(req: WhisperRequest):
     logging.debug(f"Request body: {req.dict()}")
-    task_id = models.insert_task({"url": req.url}, "whisper-video-url")
+    task_id = models.insert_task({"url": req.url}, "whisper")
     queue_name = "tasks:whisper"
     task_for_queue = {
         "id": task_id,
@@ -615,7 +615,7 @@ async def submit_whisper_audio_data(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(await file.read())
     rel_path = os.path.relpath(file_path, config.media_path)
-    task_id = models.insert_task({"rel_path": rel_path}, "whisper-audio-data")
+    task_id = models.insert_task({"rel_path": rel_path}, "whisper")
     queue_name = "tasks:whisper"
     task_for_queue = {
         "id": task_id,

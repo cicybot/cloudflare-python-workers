@@ -37,7 +37,7 @@ def heartbeat_worker(worker_id):
         try:
             memory = psutil.virtual_memory()
             response = requests.post(
-                f"{config.api_url}/update_worker",
+                f"{config.api_url}/api/update_worker",
                 json={"worker_id": worker_id, "memory_available": memory.available},
                 timeout=5,
             )
@@ -61,9 +61,9 @@ cpu_count = psutil.cpu_count(logical=True)
 cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
 gpu_info = None  # TODO: Add GPU detection if needed
 try:
-        response = requests.post(
-            f"{config.api_url}/api/register_worker",
-            json={
+    response = requests.post(
+        f"{config.api_url}/api/register_worker",
+        json={
             "worker_id": worker_id,
             "platform": platform_info,
             "memory_total": memory.total,
