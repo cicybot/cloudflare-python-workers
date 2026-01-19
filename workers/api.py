@@ -206,7 +206,7 @@ async def submit_index_tts(req: TTSRequest):
     retry_time = task_info.get("retry_time", 3) if task_info else 3
 
     # Push to Redis
-    queue_name = "tasks:tts"
+    queue_name = config.get_queue_for_task_type("index-tts")
     task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time}
     try:
         redis_client.lpush(queue_name, json.dumps(task_for_queue))
@@ -216,11 +216,6 @@ async def submit_index_tts(req: TTSRequest):
         return response
     except Exception as e:
         # If Redis fails, log and return error
-        logging.error(f"Failed to submit task {task_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to queue task")
-    except Exception as e:
-        # If Redis fails, optionally delete from DB
-        # But for now, just log and return error
         logging.error(f"Failed to submit task {task_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to queue task")
 
@@ -279,7 +274,7 @@ async def submit_voxcpm_tts(req: TTSRequest):
     retry_time = task_info.get("retry_time", 3) if task_info else 3
 
     # Push to Redis
-    queue_name = "tasks:tts"
+    queue_name = config.get_queue_for_task_type("voxcpm")
     task_for_queue = {"id": task_id, "payload": task_data, "retry_time": retry_time}
     try:
         redis_client.lpush(queue_name, json.dumps(task_for_queue))
@@ -374,157 +369,6 @@ def get_task(task_id: str):
 
 
 @app.get(
-    "/api/tasks",
-    tags=["Tasks"],
-    response_model=TasksResponse,
-    summary="Get TTS tasks filtered by status",
-    description="""
-Get a list of TTS tasks filtered by their status.
-
-**Query Parameters**:
-
-- `status`: str, Filter tasks by status. Options: `pending`, `processing`, `completed`, `failed`. Default: `completed`.
-
-**Response**:
-
-- `total`: int, Total number of tasks matching the filter.
-- `tasks`: list, Array of task objects. Each task object contains:
-  - `id`: str, Unique task identifier (UUID).
-  - `status`: str, Current task status (`pending`, `processing`, `completed`, `failed`).
-  - `result`: str or null, Result output extracted from `task_result["output"]`.
-  - `worker_id`: str or null, ID of the worker processing the task.
-  - `submit_time`: float, Timestamp when the task was submitted (from created_at).
-  - `start_time`: float or null, Timestamp when processing started (not directly tracked).
-  - `end_time`: float or null, Timestamp when processing ended (from updated_at).
-  - `duration`: float or null, Processing time in seconds.
-  - `params`: dict, TTS parameters used for the task.
-  - `error_msg`: str or null, Error message (only present if status is `failed`).
-  - `retry_time`: int, Remaining retry attempts.
-  - `task_result`: dict or null, Result data from processing (e.g., {"output": "processed", "duration": 1.23}).
-  - `task_type`: str or null, Type of the task (e.g., "index-tts", "voxcpm").
-
-**Example Response**:
-
-```json
-{
-  "total": 2,
-  "tasks": [
-    {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "status": "completed",
-      "result": "processed",
-      "task_result": {"output": "processed", "duration": 1.23},
-      "submit_time": 1700000000.0,
-      "duration": 1.23,
-      "params": {"text": "Hello"},
-      "task_type": "index-tts"
-    }
-  ]
-}
-```
-""",
-)
-def get_all_tasks(
-    status: str = Query(
-        "completed",
-        description="Filter tasks by status: pending, processing, completed, failed",
-    ),
-):
-    """Get list of TTS tasks filtered by status."""
-    logging.debug(f"Query params: status={status}")
-    rows = models.get_tasks_by_status(status)
-
-    tasks = []
-    for row in rows:
-        params = json.loads(row["data"])
-        task_data = {
-            "id": row["id"],
-            "task_type": row["task_type"],
-            "params": params,
-            "status": row["status"],
-            "result": (
-                json.loads(row["task_result"]) if row["task_result"] else {}
-            ).get("output"),
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-            "duration": row["duration"],
-            "error_msg": row["error_msg"],
-            "retry_time": row["retry_time"],
-            "task_result": json.loads(row["task_result"])
-            if row["task_result"]
-            else None,
-        }
-        tasks.append(task_data)
-
-    response = TasksResponse(total=len(tasks), tasks=tasks)
-    logging.debug(f"Response: {response.dict()}")
-    return response
-
-
-@app.post("/api/update_task", tags=["Internal"])
-async def update_task(req: UpdateTaskRequest):
-    logging.debug(f"Request body: {req.dict()}")
-    kwargs = {}
-    if req.status:
-        kwargs["status"] = req.status
-    if req.duration is not None:
-        kwargs["duration"] = req.duration
-    if req.error_msg:
-        kwargs["error_msg"] = req.error_msg
-    if req.retry_time is not None:
-        kwargs["retry_time"] = req.retry_time
-    if req.task_result:
-        kwargs["task_result"] = json.dumps(req.task_result)
-    models.update_task(req.task_id, **kwargs)
-    response = {"message": "Task updated"}
-    logging.debug(f"Response: {response}")
-    return response
-
-
-@app.post(
-    "/api/register_worker",
-    tags=["Internal"],
-    summary="Register or update a worker",
-    description="Registers a new worker or updates an existing one with system information including platform, memory, CPU, and GPU details.",
-)
-async def register_worker(req: RegisterWorkerRequest):
-    logging.debug(f"Request body: {req.dict()}")
-    try:
-        models.insert_worker(
-            req.worker_id,
-            req.platform,
-            req.memory_total,
-            req.memory_available,
-            req.cpu_count,
-            req.cpu_freq,
-            req.gpu_info,
-        )
-        response = {"message": "Worker registered or updated"}
-    except Exception as e:
-        logging.error(f"Error registering worker: {e}")
-        raise HTTPException(status_code=500, detail="Failed to register worker")
-    logging.debug(f"Response: {response}")
-    return response
-
-
-@app.post(
-    "/api/update_worker",
-    tags=["Internal"],
-    summary="Update worker heartbeat",
-    description="Updates a worker's available memory information for heartbeat monitoring.",
-)
-async def update_worker(req: UpdateWorkerRequest):
-    logging.debug(f"Request body: {req.dict()}")
-    kwargs = {}
-    if req.memory_available is not None:
-        kwargs["memory_available"] = req.memory_available
-    models.update_worker(req.worker_id, **kwargs)
-    response = {"message": "Worker updated"}
-    logging.debug(f"Response: {response}")
-    return response
-
-
-@app.get(
     "/api/workers",
     tags=["Internal"],
     summary="Get all registered workers",
@@ -534,6 +378,29 @@ async def update_worker(req: UpdateWorkerRequest):
 async def get_workers():
     workers = models.get_all_workers()
     return {"workers": workers}
+
+
+@app.get(
+    "/api/tasks",
+    tags=["Tasks"],
+    summary="Query tasks",
+    description="Retrieve tasks with optional filters for task_type, status, and limit. Use status=all or omit status to get all statuses. Use all=true to get all tasks without limit.",
+    response_model=TasksResponse,
+)
+async def get_tasks(
+    task_type: Optional[str] = Query(None, description="Filter by task type"),
+    status: Optional[str] = Query(
+        None, description="Filter by status (use 'all' or omit for all statuses)"
+    ),
+    all: bool = Query(False, description="If true, return all tasks without limit"),
+    limit: Optional[int] = Query(10, description="Maximum number of tasks to return"),
+):
+    if status == "all":
+        status = None
+    if all:
+        limit = None
+    result = models.get_tasks(task_type=task_type, status=status, limit=limit)
+    return result
 
 
 @app.post(
@@ -611,7 +478,7 @@ async def get_queue_length(task_type: Optional[str] = None):
         response = {f"queue_length_{task_type}": length}
     else:
         lengths = {}
-        for t in ["test", "whisper"]:
+        for t in config.queue_list:
             queue = config.get_queue_for_task_type(t)
             lengths[f"queue_length_{t}"] = redis_client.llen(queue)
         response = lengths

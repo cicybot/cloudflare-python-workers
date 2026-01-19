@@ -23,11 +23,18 @@ max_upload_size = int(os.getenv("MAX_UPLOAD_SIZE", "524288000"))  # 500MB defaul
 
 
 # Task types
+queue_list = ["test", "whisper", "index-tts", "voxcpm"]
+
+
 def get_queue_for_task_type(task_type):
     if task_type == "test":
-        return "tasks:tts"
+        return "tasks:test"
     elif task_type == "whisper":
         return "tasks:whisper"
+    elif task_type == "index-tts":
+        return "tasks:index-tts"
+    elif task_type == "voxcpm":
+        return "tasks:voxcpm"
     elif task_type:
         return "tasks:" + task_type
     else:

@@ -41,6 +41,16 @@ Task types use unified Redis queues named "tasks:{task_type}", where task_type i
 - Submit Whisper audio file: First upload file via `curl -X POST http://localhost:8989/api/upload -F "file=@audio.wav"`, then submit with rel_path from response.
 - Get queue length: `curl http://localhost:8989/api/queue/length` (returns lengths for all types) or `curl "http://localhost:8989/api/queue/length?task_type=test"` or `curl "http://localhost:8989/api/queue/length?task_type=whisper"`
 - Get workers: `curl http://localhost:8989/api/workers` (returns list of registered workers)
+- Query tasks: `curl "http://localhost:8989/api/tasks?all=true"` (get all tasks) or `curl "http://localhost:8989/api/tasks?status=all"` (all statuses) or `curl "http://localhost:8989/api/tasks?status=pending&limit=20"`
+
+### Updating Swagger Documentation
+After API changes, update swagger.json:
+```bash
+python api.py --port 8989 &
+sleep 3
+curl http://localhost:8989/openapi.json > swagger.json
+lsof -ti:8989 | xargs kill
+```
 
 ## Code Style Guidelines
 
